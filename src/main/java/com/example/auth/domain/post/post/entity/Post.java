@@ -27,7 +27,7 @@ public class Post extends BaseTime {
     @Builder.Default
     private List<Comment> comments = new ArrayList<>();
 
-    public void addComment(Member author, String content) {
+    public Comment addComment(Member author, String content) {
 
         Comment comment = Comment
                 .builder()
@@ -37,15 +37,17 @@ public class Post extends BaseTime {
                 .build();
 
         comments.add(comment);
+
+        return comment;
     }
 
-    public Comment getCommentById(Long id) {
+    public Comment getCommentById(long id) {
 
         return comments.stream()
                 .filter(comment -> comment.getId() == id)
                 .findFirst()
                 .orElseThrow(
-                        () -> new ServiceException("404-2", "존재하지 않는 댓글입니다")
+                        () -> new ServiceException("404-2", "존재하지 않는 댓글입니다.")
                 );
     }
 }
