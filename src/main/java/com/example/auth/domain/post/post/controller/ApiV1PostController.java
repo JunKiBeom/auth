@@ -58,10 +58,7 @@ public class ApiV1PostController {
         Member actor = rq.getAuthenticatedActor();
         Post post = postService.getItem(id).get();
 
-        if (post.getAuthor().getId() != actor.getId()) {
-            throw new ServiceException("403-1", "자신이 작성한 글만 삭제 가능합니다.");
-        }
-
+        post.canDelete(actor);
         postService.delete(post);
 
         return new RsData<>(
@@ -87,6 +84,7 @@ public class ApiV1PostController {
             throw new ServiceException("403-1", "자신이 작성한 글만 수정 가능합니다.");
         }
 
+        post.canModify(actor);
         postService.modify(post, body.title(), body.content());
         return new RsData<>(
                 "200-1",
@@ -94,7 +92,6 @@ public class ApiV1PostController {
                 null
         );
     }
-
 
     record WriteReqBody(
             @NotBlank @Length(min = 3) String title,
