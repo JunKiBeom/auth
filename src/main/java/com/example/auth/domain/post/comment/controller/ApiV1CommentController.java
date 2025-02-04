@@ -8,6 +8,7 @@ import com.example.auth.domain.post.post.service.PostService;
 import com.example.auth.global.Rq;
 import com.example.auth.global.dto.RsData;
 import com.example.auth.global.exception.ServiceException;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +22,7 @@ public class ApiV1CommentController {
 
     private final PostService postService;
     private final Rq rq;
+    private final EntityManager em;
 
     @GetMapping
     public List<CommentDto> getItems(@PathVariable long postId) {
@@ -57,9 +59,7 @@ public class ApiV1CommentController {
         Member actor = rq.getAuthenticatedActor();
         Comment comment = _write(postId, actor, reqBody.content());
 
-        // db 반영만 할 수 있으면
-        // 스프링에서 이미 em 사용, repo에게 요청하자
-        postService.flush(); // commit
+        postService.flush();
 
         return new RsData<>(
                 "201-1",
@@ -68,15 +68,6 @@ public class ApiV1CommentController {
 
     }
 
-    public Comment _write(long postId, Member actor, String content) {
-
-        Post post = postService.getItem(postId).orElseThrow(
-                () -> new ServiceException("404-1", "존재하지 않는 게시글입니다.")
-        );
-
-        Comment comment = post.addComment(actor, content);
-        return comment;
-    }
 
     record ModifyReqBody(String content) {}
 
@@ -85,13 +76,14 @@ public class ApiV1CommentController {
     public RsData<Void> modify(@PathVariable long postId, @PathVariable long id, @RequestBody ModifyReqBody reqBody) {
 
         Member actor = rq.getAuthenticatedActor();
+
         Post post = postService.getItem(postId).orElseThrow(
                 () -> new ServiceException("404-1", "존재하지 않는 게시글입니다.")
         );
 
         Comment comment = post.getCommentById(id);
 
-        if (comment.getAuthor().getId() != actor.getId()) {
+        if(!actor.isAdmin() && comment.getAuthor().getId() != actor.getId()) {
             throw new ServiceException("403-1", "자신이 작성한 댓글만 수정 가능합니다.");
         }
 
@@ -99,13 +91,14 @@ public class ApiV1CommentController {
 
         return new RsData<>(
                 "200-1",
-                "%d번 댓글 수정이 완료되었습니다.".formatted(comment.getId())
+                "%d번 댓글 수정이 완료되었습니다.".formatted(id)
         );
     }
 
+
     @DeleteMapping("{id}")
     @Transactional
-    public RsData<Void> delete (@PathVariable long postId, @PathVariable long id) {
+    public RsData<Void> delete(@PathVariable long postId, @PathVariable long id) {
 
         Member actor = rq.getAuthenticatedActor();
         Post post = postService.getItem(postId).orElseThrow(
@@ -114,7 +107,7 @@ public class ApiV1CommentController {
 
         Comment comment = post.getCommentById(id);
 
-        if (comment.getAuthor().getId() != actor.getId()) {
+        if(comment.getAuthor().getId() != actor.getId()) {
             throw new ServiceException("403-1", "자신이 작성한 댓글만 삭제 가능합니다.");
         }
 
@@ -122,8 +115,21 @@ public class ApiV1CommentController {
 
         return new RsData<>(
                 "200-1",
-                "%d번 댓글 삭제가 완료되었습니다.".formatted(comment.getId())
+                "%d번 댓글 삭제가 완료되었습니다.".formatted(id)
         );
     }
+
+
+    public Comment _write(long postId, Member actor, String content) {
+
+        Post post = postService.getItem(postId).orElseThrow(
+                () -> new ServiceException("404-1", "존재하지 않는 게시글입니다.")
+        );
+
+        Comment comment = post.addComment(actor, content);
+
+        return comment;
+    }
+
 
 }
